@@ -1,0 +1,15 @@
+[package]
+name = "m6parserkit"
+version = "0.1.1"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+m6stack = { path = "vendor/m6stack" }
+m6lexerkit = { path = "../m6lexerkit" }
+
+
+[dependencies.proc_macros]
+package = "m6parserkit-proc-macros"
+path = "proc_macros"
