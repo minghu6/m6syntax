@@ -3,9 +3,29 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::parse::{Parse, ParseStream, Result};
-use syn::{parse_macro_input, Ident, LitStr, Token};
+use syn::{
+    Ident, LitStr, Token,
+    parse::{Parse, ParseStream, Result},
+    parse_macro_input,
+};
 
+
+////////////////////////////////////////////////////////////////////////////////
+//// Utils
+
+struct CratePathPrefix {
+    crate_path: syn::Path,
+    rest: TokenStream,
+}
+
+impl Parse for CratePathPrefix {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let crate_path = input.parse()?;
+        input.parse::<Token![,]>()?;
+        let rest = input.parse::<proc_macro2::TokenStream>()?.into();
+        Ok(Self { crate_path, rest })
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //// MakeCharMatcherRules
@@ -21,9 +41,9 @@ impl Parse for MakeCharMatcherRules {
 
         while !input.is_empty() {
             let name = input.parse()?;
-                input.parse::<Token!(=>)>()?;
+            input.parse::<Token!(=>)>()?;
             let patstr = input.parse()?;
-                input.parse::<Token!(|)>()?;
+            input.parse::<Token!(|)>()?;
             let matcher_t = input.parse()?;
 
             if !input.is_empty() {
@@ -37,13 +57,16 @@ impl Parse for MakeCharMatcherRules {
     }
 }
 
+#[doc(hidden)]
 #[proc_macro]
-pub fn make_char_matcher_rules(input: TokenStream) -> TokenStream {
+pub fn __make_char_matcher_rules(input: TokenStream) -> TokenStream {
+    let CratePathPrefix { crate_path, rest } = parse_macro_input!(input);
+
     let MakeCharMatcherRules { rules } =
-        parse_macro_input!(input as MakeCharMatcherRules);
+        parse_macro_input!(rest as MakeCharMatcherRules);
 
     let mut token_stream = quote! {
-        use m6lexerkit::{
+        use #crate_path::{
             Token,
             SrcLoc,
             Symbol,
@@ -74,8 +97,6 @@ pub fn make_char_matcher_rules(input: TokenStream) -> TokenStream {
                     }
 
                     #matcher_reg_name.is_match(c)
-                    // use m6lexerkit::Regex;
-                    // Regex::new(#patstr).unwrap().is_match(&c.to_string())
                 }
             })
         } else {
@@ -88,7 +109,6 @@ pub fn make_char_matcher_rules(input: TokenStream) -> TokenStream {
                     }
 
                     #matcher_reg_name.is_match(c)
-                    // #patstr.chars().nth(0).unwrap() == c
                 }
             })
         }
@@ -96,7 +116,6 @@ pub fn make_char_matcher_rules(input: TokenStream) -> TokenStream {
 
     TokenStream::from(token_stream)
 }
-
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -119,8 +138,7 @@ impl Parse for TokenMatcherRules {
                 input.parse::<Token![=>]>()?;
                 let patstr = input.parse::<LitStr>()?;
                 rules.push((name, Some(patstr)))
-            }
-            else {
+            } else {
                 rules.push((name, None))
             }
 
@@ -133,13 +151,16 @@ impl Parse for TokenMatcherRules {
     }
 }
 
+#[doc(hidden)]
 #[proc_macro]
-pub fn make_token_matcher_rules(input: TokenStream) -> TokenStream {
+pub fn __make_token_matcher_rules(input: TokenStream) -> TokenStream {
+    let CratePathPrefix { crate_path, rest } = parse_macro_input!(input);
+
     let TokenMatcherRules { rules } =
-        parse_macro_input!(input as TokenMatcherRules);
+        parse_macro_input!(rest as TokenMatcherRules);
 
     let mut token_stream = quote! {
-        use m6lexerkit::{
+        use #crate_path::{
             Token,
             SrcLoc
         };
@@ -148,7 +169,6 @@ pub fn make_token_matcher_rules(input: TokenStream) -> TokenStream {
     let mut matchers_ts = quote! {};
 
     for (name, patstr_opt) in rules {
-
         let matcher_fn_name = Ident::new(
             &format!("{}_m", name.to_string().to_lowercase()),
             Span::call_site(),
@@ -159,14 +179,16 @@ pub fn make_token_matcher_rules(input: TokenStream) -> TokenStream {
                 &format!("{}_REG", name.to_string().to_uppercase()),
                 Span::call_site(),
             );
-            let adjust_patstr =
-                LitStr::new(&format!("^({})", patstr.value()), Span::call_site());
+            let adjust_patstr = LitStr::new(
+                &format!("^({})", patstr.value()),
+                Span::call_site(),
+            );
 
             token_stream.extend(quote! {
                 pub fn #matcher_fn_name(s: &str, from: usize) -> Option<TokenMatchResult> {
-                    m6lexerkit::lazy_static::lazy_static! {
-                        static ref #matcher_reg_name: m6lexerkit::TokenMatcher
-                            = m6lexerkit::TokenMatcher::new(#adjust_patstr, stringify!(#name));
+                    #crate_path::lazy_static::lazy_static! {
+                        static ref #matcher_reg_name: #crate_path::TokenMatcher
+                            = #crate_path::TokenMatcher::new(#adjust_patstr, stringify!(#name));
                     }
 
                     #matcher_reg_name.fetch_tok(s, from)
@@ -174,12 +196,13 @@ pub fn make_token_matcher_rules(input: TokenStream) -> TokenStream {
             });
         }
 
-        matchers_ts.extend(quote! { #matcher_fn_name as m6lexerkit::FnMatcher, });
+        matchers_ts
+            .extend(quote! { #matcher_fn_name as #crate_path::FnMatcher, });
     }
 
     token_stream.extend(quote! {
-        m6lexerkit::lazy_static::lazy_static! {
-            pub static ref MATCHERS: Vec<m6lexerkit::FnMatcher> = vec![#matchers_ts];
+        #crate_path::lazy_static::lazy_static! {
+            pub static ref MATCHERS: Vec<#crate_path::FnMatcher> = vec![#matchers_ts];
         }
     });
 

@@ -24,7 +24,6 @@ path = "proc_macros"
 name = "bash"
 path = "examples/bash/bash.rs"
 
-
 [[example]]
 name = "bashlike"
 path = "examples/bashlike/bashlike.rs"

@@ -10,12 +10,26 @@ use std::{
 pub use concat_idents::concat_idents as concat_idents2;
 pub use lazy_static;
 use m6ptr::LazyStatic;
-pub use proc_macros::{make_char_matcher_rules, make_token_matcher_rules};
+pub use proc_macros::{__make_char_matcher_rules, __make_token_matcher_rules};
 pub use regex::Regex;
 use string_interner::{
     backend::StringBackend, symbol::DefaultSymbol, StringInterner
 };
 
+
+#[macro_export]
+macro_rules! make_char_matcher_rules {
+    ($($tt:tt)*) => {
+        $crate::__make_char_matcher_rules!($crate, $($tt)*);
+    };
+}
+
+#[macro_export]
+macro_rules! make_token_matcher_rules {
+    ($($tt:tt)*) => {
+        $crate::__make_token_matcher_rules!($crate, $($tt)*);
+    };
+}
 
 pub static INTERNER: LazyStatic<StringInterner<StringBackend>> =
     LazyStatic::new(|| StringInterner::default());
@@ -580,12 +594,10 @@ pub mod prelude {
     use std::collections::HashSet;
 
     use fancy_regex::Regex as RegexEh;
-    use proc_macros::make_token_matcher_rules;
 
     use crate::{
         Span, TokenMatchResult, TokenizeErrorReason, TokenizeResult, str2sym,
     };
-
 
     pub fn trim(res: TokenizeResult) -> TokenizeResult {
         res.and_then(|toks| {
@@ -768,8 +780,6 @@ pub mod prelude {
             None
         }
     }
-
-    use crate as m6lexerkit;
 
     make_token_matcher_rules! {
         // Comment
